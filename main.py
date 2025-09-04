@@ -10,9 +10,6 @@ from datetime import datetime
 import random
 from collections import defaultdict
 import time
-from PIL import Image, ImageTk
-import io
-import base64
 
 class SachinChess:
     def __init__(self, root):
@@ -54,12 +51,12 @@ class SachinChess:
         os.makedirs("memory", exist_ok=True)
         os.makedirs(f"memory/{self.username}", exist_ok=True)
         
-        # Load previous data
+        # Setup UI first
+        self.setup_ui()
+        
+        # Then load previous data
         self.load_policy()
         self.load_stats()
-        
-        # Setup UI
-        self.setup_ui()
         
         # Start a new game
         self.new_game()
@@ -114,8 +111,12 @@ class SachinChess:
         ttk.Button(control_frame, text="New Game", command=self.new_game).grid(row=0, column=0, **button_options)
         ttk.Button(control_frame, text="Resign", command=self.resign).grid(row=1, column=0, **button_options)
         ttk.Button(control_frame, text="Offer Draw", command=self.offer_draw).grid(row=2, column=0, **button_options)
-        ttk.Button(control_frame, text="Settings", command=self.show_settings).grid(row=3, column=0, **button_options)
-        ttk.Button(control_frame, text="Game History", command=self.show_game_history).grid(row=4, column=0, **button_options)
+        
+        # Only show settings and game history for jakhar
+        if self.username.lower() == "jakhar":
+            ttk.Button(control_frame, text="Settings", command=self.show_settings).grid(row=3, column=0, **button_options)
+            ttk.Button(control_frame, text="Game History", command=self.show_game_history).grid(row=4, column=0, **button_options)
+        
         ttk.Button(control_frame, text="Save Game", command=self.save_game).grid(row=5, column=0, **button_options)
         
         # Stats frame
@@ -164,18 +165,44 @@ class SachinChess:
                 color = "#f0d9b5" if (row + col) % 2 == 0 else "#b58863"
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="", width=0)
                 
+                # Draw coordinate labels
+                if col == 0:
+                    self.canvas.create_text(x1 + 10, y1 + 10, text=str(8 - row), font=("Arial", 10), fill="#2c3e50")
+                if row == 7:
+                    self.canvas.create_text(x2 - 10, y2 - 10, text=chr(97 + col), font=("Arial", 10), fill="#2c3e50")
+                
                 # Draw pieces with better visibility
                 square = chess.square(col, row)
                 piece = self.board.piece_at(square)
                 
                 if piece:
                     piece_symbol = self.get_piece_symbol(piece)
-                    text_color = "#2c3e50" if piece.color == chess.WHITE else "#2c3e50"
+                    # Use different colors and styles for white and black pieces
+                    if piece.color == chess.WHITE:
+                        # White pieces with dark outline for contrast
+                        text_color = "#FFFFFF"  # White
+                        outline_color = "#2c3e50"  # Dark blue for outline
+                    else:
+                        # Black pieces with white outline for contrast
+                        text_color = "#000000"  # Black
+                        outline_color = "#FFFFFF"  # White for outline
+                    
                     bg_color = "#f0d9b5" if (row + col) % 2 == 0 else "#b58863"
                     
                     # Draw a subtle background for better piece visibility
                     self.canvas.create_rectangle(x1+5, y1+5, x2-5, y2-5, fill=bg_color, outline="")
                     
+                    # Draw outline for better visibility
+                    for dx, dy in [(1, 1), (1, -1), (-1, 1), (-1, -1), (1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        self.canvas.create_text(
+                            x1 + square_size // 2 + dx, 
+                            y1 + square_size // 2 + dy, 
+                            text=piece_symbol, 
+                            font=("Arial", 36, "bold"),
+                            fill=outline_color
+                        )
+                    
+                    # Draw the main piece
                     self.canvas.create_text(
                         x1 + square_size // 2, 
                         y1 + square_size // 2, 
@@ -396,8 +423,9 @@ class SachinChess:
         if self.username.lower() == "jakhar":
             self.update_policy(outcome)
         
-        # Save game
-        self.save_game()
+        # Always save game for jakhar, for others only save if not a guest
+        if self.username.lower() == "jakhar" or self.username != "Guest":
+            self.save_game()
         
         # Show result
         messagebox.showinfo("Game Over", f"Game ended: {outcome}")
@@ -475,6 +503,11 @@ class SachinChess:
             self.handle_game_over()
 
     def show_settings(self):
+        # Only allow settings for jakhar
+        if self.username.lower() != "jakhar":
+            messagebox.showinfo("Settings", "Settings are only available for user 'jakhar'")
+            return
+            
         # Create settings dialog
         settings = tk.Toplevel(self.root)
         settings.title("Learning Settings")
@@ -520,6 +553,11 @@ class SachinChess:
         ttk.Button(settings, text="Save", command=save_settings).grid(row=5, column=0, columnspan=2, pady=10)
 
     def show_game_history(self):
+        # Only allow game history for jakhar
+        if self.username.lower() != "jakhar":
+            messagebox.showinfo("Game History", "Game history is only available for user 'jakhar'")
+            return
+            
         # Create game history dialog
         history = tk.Toplevel(self.root)
         history.title("Game History")
