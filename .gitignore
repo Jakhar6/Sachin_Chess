@@ -1,0 +1,8 @@
+# Ignore all games (local storage)
+games/*
+
+# Ignore memory cache
+memory/*
+
+# Don't ignore the games_github directory
+!games_github/

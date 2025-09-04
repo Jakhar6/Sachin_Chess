@@ -10,12 +10,15 @@ from datetime import datetime
 import random
 from collections import defaultdict
 import time
+import atexit
+import subprocess
+import sys
 
 class SachinChess:
     def __init__(self, root):
         self.root = root
         self.root.title("Sachin - Personal Chess Bot")
-        self.root.geometry("1000x800")
+        self.root.geometry("1200x800")  # Increased width for captured pieces display
         self.root.configure(bg='#2c3e50')
         
         # Get username
@@ -33,8 +36,14 @@ class SachinChess:
         self.selected_square = None
         self.last_move_squares = []
         
-        # Stats
+        # Stats and learning system
         self.stats = {'wins': 0, 'losses': 0, 'draws': 0, 'games_played': 0}
+        self.bot_loss_streak = 0  # Track consecutive losses by the bot
+        self.learning_boost_active = False  # Track if learning boost is active
+        
+        # Track captured pieces
+        self.captured_white = []
+        self.captured_black = []
         
         # Learning policy
         self.policy = defaultdict(lambda: defaultdict(int))
@@ -50,6 +59,7 @@ class SachinChess:
         os.makedirs("games", exist_ok=True)
         os.makedirs("memory", exist_ok=True)
         os.makedirs(f"memory/{self.username}", exist_ok=True)
+        os.makedirs("games_github", exist_ok=True)
         
         # Setup UI first
         self.setup_ui()
@@ -58,8 +68,21 @@ class SachinChess:
         self.load_policy()
         self.load_stats()
         
+        # Register exit handler for GitHub preparation
+        atexit.register(self.on_exit)
+        
         # Start a new game
         self.new_game()
+
+    def on_exit(self):
+        # Only run if we're jakhar and have played games
+        if self.username.lower() == "jakhar" and self.stats['games_played'] > 0:
+            try:
+                # Run the preparation script
+                subprocess.run([sys.executable, "prepare_github_games.py"], check=True)
+                print("✅ Prepared latest games for GitHub.")
+            except Exception as e:
+                print(f"❌ Error preparing games for GitHub: {e}")
 
     def get_username(self):
         # Prompt for username
@@ -86,17 +109,29 @@ class SachinChess:
         
         # Title
         title_frame = ttk.Frame(main_frame)
-        title_frame.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        title_frame.grid(row=0, column=0, columnspan=3, pady=(0, 10))
         ttk.Label(title_frame, text=f"Sachin - Personal Chess Bot", style='Title.TLabel').grid(row=0, column=0)
         ttk.Label(title_frame, text=f"Player: {self.username}").grid(row=1, column=0)
         
+        # Captured pieces frame (left side)
+        captured_left_frame = ttk.Frame(main_frame)
+        captured_left_frame.grid(row=1, column=0, padx=5, pady=10, sticky=tk.N)
+        
+        self.captured_white_label = ttk.Label(captured_left_frame, text="Captured by Black:\nNone", 
+                                             font=('Arial', 10), background='#2c3e50', foreground='#ecf0f1')
+        self.captured_white_label.grid(row=0, column=0, pady=5)
+        
         # Board frame
         board_frame = ttk.Frame(main_frame)
-        board_frame.grid(row=1, column=0, padx=10, pady=10)
+        board_frame.grid(row=1, column=1, padx=10, pady=10)
         
-        # Control frame
-        control_frame = ttk.Frame(main_frame)
-        control_frame.grid(row=1, column=1, padx=10, pady=10, sticky=tk.N)
+        # Captured pieces frame (right side)
+        captured_right_frame = ttk.Frame(main_frame)
+        captured_right_frame.grid(row=1, column=2, padx=5, pady=10, sticky=tk.N)
+        
+        self.captured_black_label = ttk.Label(captured_right_frame, text="Captured by White:\nNone", 
+                                             font=('Arial', 10), background='#2c3e50', foreground='#ecf0f1')
+        self.captured_black_label.grid(row=0, column=0, pady=5)
         
         # Create board with larger size
         self.canvas = tk.Canvas(board_frame, width=640, height=640, bg='#34495e', highlightthickness=0)
@@ -106,29 +141,33 @@ class SachinChess:
         # Draw empty board
         self.draw_board()
         
+        # Control frame
+        control_frame = ttk.Frame(main_frame)
+        control_frame.grid(row=2, column=0, columnspan=3, padx=10, pady=10, sticky=tk.N)
+        
         # Control buttons
         button_options = {'pady': 8, 'sticky': tk.EW, 'ipady': 5}
         ttk.Button(control_frame, text="New Game", command=self.new_game).grid(row=0, column=0, **button_options)
-        ttk.Button(control_frame, text="Resign", command=self.resign).grid(row=1, column=0, **button_options)
-        ttk.Button(control_frame, text="Offer Draw", command=self.offer_draw).grid(row=2, column=0, **button_options)
+        ttk.Button(control_frame, text="Resign", command=self.resign).grid(row=0, column=1, **button_options)
+        ttk.Button(control_frame, text="Offer Draw", command=self.offer_draw).grid(row=0, column=2, **button_options)
         
         # Only show settings and game history for jakhar
         if self.username.lower() == "jakhar":
-            ttk.Button(control_frame, text="Settings", command=self.show_settings).grid(row=3, column=0, **button_options)
-            ttk.Button(control_frame, text="Game History", command=self.show_game_history).grid(row=4, column=0, **button_options)
+            ttk.Button(control_frame, text="Settings", command=self.show_settings).grid(row=0, column=3, **button_options)
+            ttk.Button(control_frame, text="Game History", command=self.show_game_history).grid(row=0, column=4, **button_options)
         
-        ttk.Button(control_frame, text="Save Game", command=self.save_game).grid(row=5, column=0, **button_options)
+        ttk.Button(control_frame, text="Save Game", command=self.save_game).grid(row=0, column=5, **button_options)
         
         # Stats frame
         stats_frame = ttk.LabelFrame(control_frame, text="Stats")
-        stats_frame.grid(row=6, column=0, pady=10, sticky=tk.EW)
+        stats_frame.grid(row=1, column=0, columnspan=3, pady=10, sticky=tk.EW)
         
-        self.stats_label = ttk.Label(stats_frame, text="Games: 0\nWins: 0\nLosses: 0\nDraws: 0", font=('Arial', 10))
+        self.stats_label = ttk.Label(stats_frame, text="Games: 0\nWins: 0\nLosses: 0\nDraws: 0\nLoss Streak: 0", font=('Arial', 10))
         self.stats_label.grid(row=0, column=0, pady=5)
         
         # Move list
         move_frame = ttk.LabelFrame(control_frame, text="Moves")
-        move_frame.grid(row=7, column=0, pady=10, sticky=tk.EW)
+        move_frame.grid(row=1, column=3, columnspan=3, pady=10, sticky=tk.EW)
         
         self.move_list = tk.Listbox(move_frame, height=15, width=25, bg='#ecf0f1', font=('Courier', 10))
         scrollbar = ttk.Scrollbar(move_frame, orient=tk.VERTICAL, command=self.move_list.yview)
@@ -140,16 +179,69 @@ class SachinChess:
         self.status_var = tk.StringVar()
         self.status_var.set("Welcome to Sachin Chess!")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, background='#34495e', foreground='#ecf0f1')
-        status_bar.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        status_bar.grid(row=3, column=0, sticky=(tk.W, tk.E))
         
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=0)
+        main_frame.columnconfigure(0, weight=0)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(2, weight=0)
         main_frame.rowconfigure(1, weight=1)
         move_frame.columnconfigure(0, weight=1)
         move_frame.rowconfigure(0, weight=1)
+
+    def update_captured_pieces_display(self):
+        """Update the display of captured pieces"""
+        # Count captured pieces by type and value
+        white_captured_count = {}
+        black_captured_count = {}
+        
+        for piece in self.captured_white:
+            piece_type = piece.symbol().upper()
+            white_captured_count[piece_type] = white_captured_count.get(piece_type, 0) + 1
+        
+        for piece in self.captured_black:
+            piece_type = piece.symbol().upper()
+            black_captured_count[piece_type] = black_captured_count.get(piece_type, 0) + 1
+        
+        # Create display text with point values
+        white_text = "Captured by Black:\n"
+        if white_captured_count:
+            total = 0
+            for piece, count in white_captured_count.items():
+                value = self.get_piece_value_from_symbol(piece)
+                total += value * count
+                white_text += f"{count}{piece} ({value*count})\n"
+            white_text += f"Total: {total}"
+        else:
+            white_text += "None"
+        
+        black_text = "Captured by White:\n"
+        if black_captured_count:
+            total = 0
+            for piece, count in black_captured_count.items():
+                value = self.get_piece_value_from_symbol(piece)
+                total += value * count
+                black_text += f"{count}{piece} ({value*count})\n"
+            black_text += f"Total: {total}"
+        else:
+            black_text += "None"
+        
+        self.captured_white_label.config(text=white_text)
+        self.captured_black_label.config(text=black_text)
+
+    def get_piece_value_from_symbol(self, symbol):
+        """Get the value of a piece from its symbol"""
+        values = {
+            'P': 1,  # Pawn
+            'N': 3,  # Knight
+            'B': 3,  # Bishop
+            'R': 5,  # Rook
+            'Q': 9,  # Queen
+            'K': 0,  # King (not captured in normal play)
+        }
+        return values.get(symbol, 0)
 
     def draw_board(self):
         self.canvas.delete("all")
@@ -249,6 +341,16 @@ class SachinChess:
         if self.selected_square is not None:
             move = chess.Move(self.selected_square, square)
             
+            # Check for capture
+            if self.board.is_capture(move):
+                captured_piece = self.board.piece_at(move.to_square)
+                if captured_piece:
+                    if captured_piece.color == chess.WHITE:
+                        self.captured_white.append(captured_piece)
+                    else:
+                        self.captured_black.append(captured_piece)
+                    self.update_captured_pieces_display()
+            
             # Check for promotion
             if (self.board.piece_type_at(self.selected_square) == chess.PAWN and 
                 chess.square_rank(square) in [0, 7]):
@@ -323,6 +425,16 @@ class SachinChess:
         
         # Add a small delay for realism
         time.sleep(0.5)
+        
+        # Check for capture
+        if self.board.is_capture(move):
+            captured_piece = self.board.piece_at(move.to_square)
+            if captured_piece:
+                if captured_piece.color == chess.WHITE:
+                    self.captured_white.append(captured_piece)
+                else:
+                    self.captured_black.append(captured_piece)
+                self.update_captured_pieces_display()
         
         self.make_move(move)
         self.bot_thinking = False
@@ -407,17 +519,36 @@ class SachinChess:
             outcome = "White wins"
             if self.human_color == chess.WHITE:
                 self.stats['wins'] += 1
+                # Human won, bot lost
+                self.bot_loss_streak += 1
+                if self.bot_loss_streak >= 5:
+                    self.learning_boost_active = True
+                    print("⚡ Bot is learning faster to catch up!")
             else:
                 self.stats['losses'] += 1
+                # Bot won, reset streak
+                self.bot_loss_streak = 0
+                self.learning_boost_active = False
         elif result == "0-1":
             outcome = "Black wins"
             if self.human_color == chess.BLACK:
                 self.stats['wins'] += 1
+                # Human won, bot lost
+                self.bot_loss_streak += 1
+                if self.bot_loss_streak >= 5:
+                    self.learning_boost_active = True
+                    print("⚡ Bot is learning faster to catch up!")
             else:
                 self.stats['losses'] += 1
+                # Bot won, reset streak
+                self.bot_loss_streak = 0
+                self.learning_boost_active = False
         else:
             outcome = "Draw"
             self.stats['draws'] += 1
+            # Draw, reset streak
+            self.bot_loss_streak = 0
+            self.learning_boost_active = False
         
         # Update learning policy only if user is jakhar
         if self.username.lower() == "jakhar":
@@ -428,33 +559,51 @@ class SachinChess:
             self.save_game()
         
         # Show result
-        messagebox.showinfo("Game Over", f"Game ended: {outcome}")
+        messagebox.showinfo("Game Over", f"Game ended: {outcome}\nBot loss streak: {self.bot_loss_streak}")
         
         # Update stats display
         self.update_stats_display()
 
     def update_policy(self, outcome):
+        # Calculate dynamic rewards based on loss streak
+        if self.learning_boost_active:
+            win_reward = self.learning_params['win_reward'] * 3
+            draw_reward = self.learning_params['draw_reward'] * 2
+            loss_reward = self.learning_params['loss_reward'] * 2
+            print(f"⚡ Using boosted rewards: win={win_reward}, draw={draw_reward}, loss={loss_reward}")
+        else:
+            win_reward = self.learning_params['win_reward']
+            draw_reward = self.learning_params['draw_reward']
+            loss_reward = self.learning_params['loss_reward']
+        
         reward = 0
         
         if outcome == "White wins":
-            reward = self.learning_params['win_reward'] if self.human_color == chess.WHITE else self.learning_params['loss_reward']
+            reward = win_reward if self.human_color == chess.WHITE else loss_reward
         elif outcome == "Black wins":
-            reward = self.learning_params['win_reward'] if self.human_color == chess.BLACK else self.learning_params['loss_reward']
+            reward = win_reward if self.human_color == chess.BLACK else loss_reward
         else:  # Draw
-            reward = self.learning_params['draw_reward']
+            reward = draw_reward
         
         # Replay the game and update policy for human moves
         temp_board = chess.Board()
+        policy_updates = 0
+        
         for i, move in enumerate(self.move_history):
             if temp_board.turn == self.human_color:
                 fen = self.get_normalized_fen_from_board(temp_board)
                 move_uci = move.uci()
                 self.policy[fen][move_uci] += reward
+                policy_updates += 1
             
             temp_board.push(move)
         
         # Save updated policy
         self.save_policy()
+        
+        # Debug log
+        print(f"📊 Policy updated with {policy_updates} moves. Total states: {len(self.policy)}")
+        print(f"📈 Bot loss streak: {self.bot_loss_streak}, Learning boost: {self.learning_boost_active}")
 
     def get_normalized_fen_from_board(self, board):
         return ' '.join(board.fen().split()[:4])
@@ -468,6 +617,11 @@ class SachinChess:
         self.move_history = []
         self.last_move_squares = []
         self.selected_square = None
+        
+        # Reset captured pieces
+        self.captured_white = []
+        self.captured_black = []
+        self.update_captured_pieces_display()
         
         # Ask for color preference
         color = messagebox.askquestion("Color Selection", "Do you want to play as White?")
@@ -657,8 +811,10 @@ class SachinChess:
                 self.policy = defaultdict(lambda: defaultdict(int))
                 for k, v in policy_dict.items():
                     self.policy[k] = defaultdict(int, v)
+                print(f"📂 Loaded policy with {len(self.policy)} states")
         except FileNotFoundError:
             self.policy = defaultdict(lambda: defaultdict(int))
+            print("📂 No existing policy found, starting fresh")
 
     def save_stats(self):
         # Save stats for the current user
@@ -678,11 +834,13 @@ class SachinChess:
             with open(stats_file, "r") as f:
                 self.stats = json.load(f)
                 self.update_stats_display()
+                print(f"📊 Loaded stats: {self.stats}")
         except FileNotFoundError:
             self.stats = {'wins': 0, 'losses': 0, 'draws': 0, 'games_played': 0}
+            print("📊 No existing stats found, starting fresh")
 
     def update_stats_display(self):
-        stats_text = f"Games: {self.stats['games_played']}\nWins: {self.stats['wins']}\nLosses: {self.stats['losses']}\nDraws: {self.stats['draws']}"
+        stats_text = f"Games: {self.stats['games_played']}\nWins: {self.stats['wins']}\nLosses: {self.stats['losses']}\nDraws: {self.stats['draws']}\nLoss Streak: {self.bot_loss_streak}"
         self.stats_label.config(text=stats_text)
 
 if __name__ == "__main__":
