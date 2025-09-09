@@ -1,80 +1,62 @@
+#!/usr/bin/env python3
+"""
+Script to prepare games for GitHub repository.
+This script organizes and formats game files for public sharing.
+"""
+
 import os
+import json
 import shutil
 from datetime import datetime
 
-def prepare_github_games():
-    # Paths
-    local_games = "games"
-    github_games = "games_github"
+def prepare_games():
+    # Create the games_github directory if it doesn't exist
+    os.makedirs('games_github', exist_ok=True)
     
-    # Ensure target folder exists
-    os.makedirs(github_games, exist_ok=True)
+    # Copy all PGN files from games to games_github
+    if os.path.exists('games'):
+        for filename in os.listdir('games'):
+            if filename.endswith('.pgn'):
+                src = os.path.join('games', filename)
+                dest = os.path.join('games_github', filename)
+                shutil.copy2(src, dest)
+                print(f"Copied {filename} to games_github")
     
-    # Get all PGN files sorted by creation time (newest first)
-    all_games = []
-    if os.path.exists(local_games):
-        for f in os.listdir(local_games):
-            if f.endswith(".pgn"):
-                full_path = os.path.join(local_games, f)
-                # Get creation time
-                ctime = os.path.getctime(full_path)
-                all_games.append((ctime, f))
+    # Create a README file with statistics
+    create_readme()
     
-    # Sort by creation time (newest first)
-    all_games.sort(key=lambda x: x[0], reverse=True)
-    
-    # Keep only the last 50
-    latest_games = [f[1] for f in all_games[:50]]
-    
-    # Clear github folder first (remove all PGN files)
-    for f in os.listdir(github_games):
-        if f.endswith(".pgn"):
-            os.remove(os.path.join(github_games, f))
-    
-    # Copy last 50 games
-    for f in latest_games:
-        src = os.path.join(local_games, f)
-        dst = os.path.join(github_games, f)
-        shutil.copy2(src, dst)
-    
-    print(f"✅ Prepared {len(latest_games)} latest games for GitHub.")
-    
-    # Also prepare a summary file
-    summary_path = os.path.join(github_games, "README.md")
-    with open(summary_path, "w") as summary_file:
-        summary_file.write("# Last 50 Games\n\n")
-        summary_file.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        summary_file.write("| Date | Player | Result |\n")
-        summary_file.write("|------|--------|--------|\n")
-        
-        for game_file in latest_games:
-            # Extract info from filename
-            parts = game_file.split('_')
-            if len(parts) >= 3:
-                date_str = parts[0]
-                player = parts[1]
-                # Try to parse the date
-                try:
-                    date_obj = datetime.strptime(date_str, "%Y%m%d")
-                    formatted_date = date_obj.strftime("%Y-%m-%d")
-                except:
-                    formatted_date = date_str
-                
-                # Try to get result from file content
-                result = "Unknown"
-                try:
-                    with open(os.path.join(github_games, game_file), 'r') as f:
-                        content = f.read()
-                        if "1-0" in content:
-                            result = "White wins"
-                        elif "0-1" in content:
-                            result = "Black wins"
-                        elif "1/2-1/2" in content:
-                            result = "Draw"
-                except:
-                    pass
-                
-                summary_file.write(f"| {formatted_date} | {player} | {result} |\n")
+    print("✅ Games prepared for GitHub")
 
-if __name__ == "__main__":
-    prepare_github_games()
+def create_readme():
+    # Try to load stats
+    stats = {}
+    if os.path.exists('memory/jakhar/stats.json'):
+        with open('memory/jakhar/stats.json', 'r') as f:
+            stats = json.load(f)
+    
+    # Create README content
+    readme_content = f"""# Sachin Chess Games
+
+This repository contains chess games played against Sachin, the learning chess bot.
+
+## Statistics
+- Total games: {stats.get('games_played', 0)}
+- Wins: {stats.get('wins', 0)}
+- Losses: {stats.get('losses', 0)}
+- Draws: {stats.get('draws', 0)}
+
+## About Sachin
+Sachin is a chess bot that learns from its games. It uses a policy-based reinforcement learning approach to improve its play over time.
+
+## Game Files
+All games are stored in PGN format, which can be viewed with any chess software or online PGN viewer.
+
+Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+    
+    # Write README file
+    with open('games_github/README.md', 'w') as f:
+        f.write(readme_content)
+
+if __name__ == '__main__':
+    prepare_games()
