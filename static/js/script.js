@@ -402,6 +402,7 @@ function renderBoard() {
                 const pieceElement = document.createElement('div');
                 pieceElement.className = 'piece';
                 pieceElement.textContent = getUnicodePiece(piece);
+                pieceElement.setAttribute('data-piece', piece);
                 square.appendChild(pieceElement);
             }
             
@@ -417,6 +418,8 @@ function renderBoard() {
 }
 
 function getUnicodePiece(pieceCode) {
+    if (!pieceCode) return '';
+    
     const pieces = {
         'wp': '♙', 'wr': '♖', 'wn': '♘', 'wb': '♗', 'wq': '♕', 'wk': '♔',
         'bp': '♟', 'br': '♜', 'bn': '♞', 'bb': '♝', 'bq': '♛', 'bk': '♚'
@@ -667,9 +670,9 @@ function updateStats() {
 
 function updateTimers() {
     const whiteMinutes = Math.floor(gameState.timers.white / 60);
-    const whiteSeconds = gameState.timers.white % 60;
+    const whiteSeconds = Math.floor(gameState.timers.white % 60);
     const blackMinutes = Math.floor(gameState.timers.black / 60);
-    const blackSeconds = gameState.timers.black % 60;
+    const blackSeconds = Math.floor(gameState.timers.black % 60);
     
     document.getElementById('white-timer').textContent = 
         `${whiteMinutes}:${whiteSeconds < 10 ? '0' : ''}${whiteSeconds}`;

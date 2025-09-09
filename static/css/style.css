@@ -183,7 +183,54 @@ body {
 .captured-piece {
     font-size: 20px;
 }
+/* Chess pieces styling */
+.piece {
+    font-size: 30px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
 
+/* White pieces */
+.square .piece[data-piece^="w"] {
+    color: #f0f0f0;
+    text-shadow: 1px 1px 3px #888;
+}
+
+/* Black pieces */
+.square .piece[data-piece^="b"] {
+    color: #111;
+    text-shadow: 1px 1px 2px #222;
+}
+
+/* Player icons styling */
+.player-icon {
+    font-size: 24px;
+}
+
+.player-info:nth-child(1) .player-icon { /* Black player (top) */
+    color: #111;
+    text-shadow: 1px 1px 2px #222;
+}
+
+.player-info:nth-child(3) .player-icon { /* White player (bottom) */
+    color: #f0f0f0;
+    text-shadow: 1px 1px 3px #888;
+}
+
+/* Captured pieces styling */
+.captured-white .captured-piece {
+    color: #f0f0f0;
+    text-shadow: 1px 1px 3px #888;
+}
+
+.captured-black .captured-piece {
+    color: #111;
+    text-shadow: 1px 1px 2px #222;
+}
 .controls {
     display: flex;
     gap: 10px;
@@ -395,7 +442,38 @@ body {
 .promotion-option:hover {
     background-color: var(--secondary);
 }
+.captured-piece {
+    font-size: 20px;
+}
 
+/* Add the piece styling here */
+.piece {
+    font-size: 30px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* White pieces */
+.square .piece[data-piece^="w"] {
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Black pieces */
+.square .piece[data-piece^="b"] {
+    color: black;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
 @media (max-width: 900px) {
     .chess-container {
         flex-direction: column;
